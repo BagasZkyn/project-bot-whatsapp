@@ -1,63 +1,54 @@
 const yts = require('yt-search');
-const axios = require('axios');
+const ytdl = require('ytdl-core');
 
 async function playCommand(sock, chatId, message) {
     try {
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const text = message.message?.conversation || 
+                     message.message?.extendedTextMessage?.text;
+
         const searchQuery = text.split(' ').slice(1).join(' ').trim();
-        
+
         if (!searchQuery) {
             return await sock.sendMessage(chatId, { 
-                text: "What song do you want to download?"
+                text: "Masukkan judul lagu!\nContoh: .play perfect ed sheeran"
             });
         }
 
-        // Search for the song
-        const { videos } = await yts(searchQuery);
-        if (!videos || videos.length === 0) {
+        // Cari video
+        const search = await yts(searchQuery);
+        const video = search.videos[0];
+
+        if (!video) {
             return await sock.sendMessage(chatId, { 
-                text: "No songs found!"
+                text: "Lagu tidak ditemukan!"
             });
         }
 
-        // Send loading message
         await sock.sendMessage(chatId, {
-            text: "_Please wait your download is in progress_"
+            text: "⏳ Sedang memproses download..."
         });
 
-        // Get the first video result
-        const video = videos[0];
-        const urlYt = video.url;
+        const url = video.url;
 
-        // Fetch audio data from API
-        const response = await axios.get(`https://apis-keith.vercel.app/download/dlmp3?url=${urlYt}`);
-        const data = response.data;
+        // Ambil audio format
+        const audioStream = ytdl(url, {
+            filter: 'audioonly',
+            quality: 'highestaudio'
+        });
 
-        if (!data || !data.status || !data.result || !data.result.downloadUrl) {
-            return await sock.sendMessage(chatId, { 
-                text: "Failed to fetch audio from the API. Please try again later."
-            });
-        }
-
-        const audioUrl = data.result.downloadUrl;
-        const title = data.result.title;
-
-        // Send the audio
+        // Kirim audio
         await sock.sendMessage(chatId, {
-            audio: { url: audioUrl },
-            mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`
+            audio: audioStream,
+            mimetype: 'audio/mpeg',
+            fileName: `${video.title}.mp3`
         }, { quoted: message });
 
-    } catch (error) {
-        console.error('Error in song2 command:', error);
-        await sock.sendMessage(chatId, { 
-            text: "Download failed. Please try again later."
+    } catch (err) {
+        console.error(err);
+        await sock.sendMessage(chatId, {
+            text: "❌ Download gagal, coba lagi nanti."
         });
     }
 }
 
-module.exports = playCommand; 
-
-/*Powered by KNIGHT-BOT*
-*Credits to Keith MD*`*/
+module.exports = playCommand;
