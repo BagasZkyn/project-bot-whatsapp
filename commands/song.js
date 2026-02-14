@@ -1,9 +1,11 @@
+const axios = require('axios');
 const yts = require('yt-search');
-const ytdl = require('@distube/ytdl-core');
+
+const API_BASE = 'https://api.akuari.my.id/downloader/ytmp3?link=';
 
 async function songCommand(sock, chatId, message) {
     try {
-        const text = message.message?.conversation || 
+        const text = message.message?.conversation ||
                      message.message?.extendedTextMessage?.text || '';
 
         if (!text) {
@@ -12,7 +14,7 @@ async function songCommand(sock, chatId, message) {
             }, { quoted: message });
         }
 
-        // Search video
+        // 🔎 Search YouTube
         const search = await yts(text);
         if (!search.videos.length) {
             return await sock.sendMessage(chatId, {
@@ -27,29 +29,29 @@ async function songCommand(sock, chatId, message) {
             caption: `🎵 Downloading: *${video.title}*`
         }, { quoted: message });
 
-        // Ambil audio info
-        const info = await ytdl.getInfo(video.url);
+        // 📡 Request ke API downloader
+        const apiUrl = API_BASE + encodeURIComponent(video.url);
+        const res = await axios.get(apiUrl, { timeout: 60000 });
 
-        const format = ytdl.chooseFormat(info.formats, {
-            quality: 'highestaudio',
-            filter: 'audioonly'
-        });
-
-        // Download ke buffer
-        const stream = ytdl.downloadFromInfo(info, { format });
-
-        const chunks = [];
-        for await (const chunk of stream) {
-            chunks.push(chunk);
+        if (!res.data || !res.data.result || !res.data.result.url) {
+            throw new Error('API gagal');
         }
 
-        const buffer = Buffer.concat(chunks);
+        const downloadUrl = res.data.result.url;
+
+        // 📥 Download audio jadi buffer
+        const audioRes = await axios.get(downloadUrl, {
+            responseType: 'arraybuffer',
+            timeout: 90000
+        });
+
+        const buffer = Buffer.from(audioRes.data);
 
         if (!buffer || buffer.length === 0) {
             throw new Error('Buffer kosong');
         }
 
-        // Kirim ke WhatsApp
+        // 📤 Kirim ke WhatsApp
         await sock.sendMessage(chatId, {
             audio: buffer,
             mimetype: 'audio/mpeg',
@@ -59,7 +61,6 @@ async function songCommand(sock, chatId, message) {
 
     } catch (err) {
         console.error('Song command error:', err);
-
         await sock.sendMessage(chatId, {
             text: '❌ Gagal download lagu.'
         }, { quoted: message });
