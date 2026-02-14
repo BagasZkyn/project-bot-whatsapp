@@ -13,7 +13,7 @@ async function helpCommand(sock, chatId, message) {
 *Available Commands:*
 
 ╔═══════════════════╗
-🌐 *General Commands*:
+🌐 *Perintah Umum*:
 ║ ➤ .help or .menu
 ║ ➤ .ping
 ║ ➤ .alive
