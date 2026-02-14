@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# environment
+.env
+.env.local
+
+# baileys session
+auth_info_baileys/
+session/
+baileys_session/
+
+# logs
+*.log
+
+# temp
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db

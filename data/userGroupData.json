@@ -1,0 +1,29 @@
+{
+  "users": [],
+  "groups": [],
+  "antilink": {
+    "120363422186903125@g.us": {
+      "enabled": true,
+      "action": "delete"
+    }
+  },
+  "antibadword": {},
+  "warnings": {},
+  "sudo": [],
+  "welcome": {
+    "120363403088541646@g.us": {
+      "enabled": true,
+      "message": "WELCOME KINK",
+      "channelId": "120363161513685998@newsletter"
+    }
+  },
+  "goodbye": {
+    "120363403088541646@g.us": {
+      "enabled": true,
+      "message": "MALAH KELUAR",
+      "channelId": "120363161513685998@newsletter"
+    }
+  },
+  "chatbot": {},
+  "autoReaction": false
+}
