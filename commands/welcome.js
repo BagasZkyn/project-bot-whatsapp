@@ -92,8 +92,11 @@ async function handleJoinEvent(sock, id, participants) {
                     console.log('Could not fetch profile picture, using default');
                 }
                 
-                // Construct API URL for welcome image
-                const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming3?type=join&textcolor=green&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl)}`;
+                // Get user number
+                const userNumber = participantString.split('@')[0];
+                
+                // Construct API URL for welcome image (use number instead of display name)
+                const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming3?type=join&textcolor=green&username=${encodeURIComponent(userNumber)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl)}`;
                 
                 // Fetch the welcome image
                 const response = await fetch(apiUrl);
