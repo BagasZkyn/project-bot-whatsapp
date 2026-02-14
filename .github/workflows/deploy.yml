@@ -1,24 +1,39 @@
-name: Deploy Bot
+name: Deploy Bot WA to VPS
 
 on:
-  workflow_dispatch:
   push:
     branches:
-      - main
+      - main  # Trigger hanya saat ada push ke branch main
 
 jobs:
   deploy:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /root/botwa
-            git pull origin main
-            npm install
-            pm2 restart wabot || pm2 start index.js --name wabot
+    - name: Connect via SSH and Deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22 # Ganti jika port SSH Anda bukan 22
+        script: |
+          # Masuk ke folder project
+          cd /root/botwa
+          
+          # Reset perubahan lokal (opsional, agar git pull tidak konflik)
+          git reset --hard
+          
+          # Tarik code terbaru dari github
+          git pull origin main
+          
+          # Install dependency baru (jika ada update di package.json)
+          npm install --production
+          
+          # Restart proses bot menggunakan PM2
+          # Jika proses belum ada, dia akan mencoba start baru
+          pm2 restart wabot || pm2 start index.js --name "wabot"
+          
+          # Simpan state PM2
+          pm2 save
