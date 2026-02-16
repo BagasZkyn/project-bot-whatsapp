@@ -212,15 +212,6 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .facepalm 
 ╚═══════════════════╝
 
-╔═══════════════════╗
-💻 *Github Commands:*
-║ ➤ .git
-║ ➤ .github
-║ ➤ .sc
-║ ➤ .script
-║ ➤ .repo
-╚═══════════════════╝
-
 Join our channel for updates:`;
 
     try {
