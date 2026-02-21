@@ -13,14 +13,29 @@
   "welcome": {
     "120363403088541646@g.us": {
       "enabled": true,
-      "message": "WELCOME KINK",
+      "message": "Welcome {user} Selamat Bergabung di Grub *{group}* Jangan Lupa Baca Peraturan Grub Broku.",
+      "channelId": "120363161513685998@newsletter"
+    },
+    "120363417616190555@g.us": {
+      "enabled": true,
+      "message": "Welcome {user} to {group}! 🎉",
+      "channelId": "120363161513685998@newsletter"
+    },
+    "120363423511344137@g.us": {
+      "enabled": true,
+      "message": "Welcome {user} to {group}! 🎉",
       "channelId": "120363161513685998@newsletter"
     }
   },
   "goodbye": {
-    "120363403088541646@g.us": {
+    "120363417616190555@g.us": {
       "enabled": true,
-      "message": "MALAH KELUAR",
+      "message": "Goodbye {user} 👋",
+      "channelId": "120363161513685998@newsletter"
+    },
+    "120363423511344137@g.us": {
+      "enabled": true,
+      "message": "Goodbye {user} 👋",
       "channelId": "120363161513685998@newsletter"
     }
   },

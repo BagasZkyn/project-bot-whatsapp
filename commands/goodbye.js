@@ -1,6 +1,7 @@
 const { handleGoodbye } = require('../lib/welcome');
 const { isGoodByeOn, getGoodbye } = require('../lib/index');
 const fetch = require('node-fetch');
+const { generateGoodbyeImage } = require('../lib/imageGen');
 
 async function goodbyeCommand(sock, chatId, message, match) {
     // Check if it's a group
@@ -10,8 +11,8 @@ async function goodbyeCommand(sock, chatId, message, match) {
     }
 
     // Extract match from message
-    const text = message.message?.conversation || 
-                message.message?.extendedTextMessage?.text || '';
+    const text = message.message?.conversation ||
+        message.message?.extendedTextMessage?.text || '';
     const matchText = text.split(' ').slice(1).join(' ');
 
     await handleGoodbye(sock, chatId, message, matchText);
@@ -34,8 +35,29 @@ async function handleLeaveEvent(sock, id, participants) {
         try {
             // Handle case where participant might be an object or not a string
             const participantString = typeof participant === 'string' ? participant : (participant.id || participant.toString());
-            const user = participantString.split('@')[0];
-            
+            let targetId = participantString;
+            let cleanId = targetId.split(':')[0];
+            if (cleanId.endsWith('@lid')) {
+                cleanId = cleanId; // we strip port
+            } else if (!cleanId.includes('@')) {
+                cleanId = cleanId + '@s.whatsapp.net';
+            }
+
+            let realJid = cleanId;
+            if (cleanId.includes('@lid')) {
+                try {
+                    // Try to resolve the LID to a true JID via the WhatsApp business API / contact nodes
+                    const [result] = await sock.onWhatsApp(participantString);
+                    if (result && result.jid) {
+                        realJid = result.jid;
+                    }
+                } catch (e) {
+                    console.log('Could not resolve LID via onWhatsApp');
+                }
+            }
+
+            const user = realJid.split('@')[0];
+
             // Get user's display name
             let displayName = user; // Default to phone number
             try {
@@ -53,18 +75,18 @@ async function handleLeaveEvent(sock, id, participants) {
             } catch (nameError) {
                 console.log('Could not fetch display name, using phone number');
             }
-            
+
             // Process custom message with variables
             let finalMessage;
             if (customMessage) {
                 finalMessage = customMessage
-                    .replace(/{user}/g, `@${displayName}`)
+                    .replace(/{user}/g, `@${user}`)
                     .replace(/{group}/g, groupName);
             } else {
                 // Default message if no custom message is set
                 finalMessage = ` *@${displayName}* we will never miss you! `;
             }
-            
+
             // Try to send with image first (always try images)
             try {
                 // Get user profile picture
@@ -77,27 +99,33 @@ async function handleLeaveEvent(sock, id, participants) {
                 } catch (profileError) {
                     console.log('Could not fetch profile picture, using default');
                 }
-                
+
                 // Construct API URL for goodbye image
-                const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming1?type=leave&textcolor=red&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl)}`;
-                
-                // Fetch the goodbye image
-                const response = await fetch(apiUrl);
-                if (response.ok) {
-                    const imageBuffer = await response.buffer();
-                    
-                    // Send goodbye image with caption (custom or default message)
-                    await sock.sendMessage(id, {
-                        image: imageBuffer,
-                        caption: finalMessage,
-                        mentions: [participantString]
-                    });
-                    continue; // Skip to next participant
-                }
+                const imageBuffer = await generateGoodbyeImage(displayName, user, profilePicUrl, groupName, groupMetadata.participants.length);
+
+                const now = new Date();
+                const timeString = now.toLocaleString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+
+                finalMessage = `╭╼━≪•𝙻𝙴𝙵𝚃 𝙼𝙴𝙼𝙱𝙴𝚁•≫━╾╮\n┃𝙶𝙾𝙾𝙳𝙱𝚈𝙴: @${user} 👋\n┃Member count: #${groupMetadata.participants.length}\n┃𝚃𝙸𝙼𝙴: ${timeString}⏰\n╰━━━━━━━━━━━━━━━╯\n\n*@${user}* Has Left *${groupName}*! 😢\n\n> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ Nathan Bot*`;
+
+                await sock.sendMessage(id, {
+                    image: imageBuffer,
+                    caption: finalMessage,
+                    mentions: [participantString]
+                });
+                continue; // Skip to next participant
             } catch (imageError) {
                 console.log('Image generation failed, falling back to text');
             }
-            
+
             // Send text message (either custom message or fallback)
             await sock.sendMessage(id, {
                 text: finalMessage,
@@ -108,7 +136,7 @@ async function handleLeaveEvent(sock, id, participants) {
             // Fallback to text message
             const participantString = typeof participant === 'string' ? participant : (participant.id || participant.toString());
             const user = participantString.split('@')[0];
-            
+
             // Use custom message if available, otherwise use simple fallback
             let fallbackMessage;
             if (customMessage) {
@@ -118,7 +146,7 @@ async function handleLeaveEvent(sock, id, participants) {
             } else {
                 fallbackMessage = `Goodbye @${user}! 👋`;
             }
-            
+
             await sock.sendMessage(id, {
                 text: fallbackMessage,
                 mentions: [participantString]

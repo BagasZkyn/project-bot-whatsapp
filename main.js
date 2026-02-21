@@ -142,12 +142,15 @@ const { anticallCommand, readState: readAnticallState } = require('./commands/an
 const { pmblockerCommand, readState: readPmBlockerState } = require('./commands/pmblocker');
 const settingsCommand = require('./commands/settings');
 const soraCommand = require('./commands/sora');
+const { gcCloseCommand, gcOpenCommand } = require('./commands/gc');
+const testWelcomeCommand = require('./commands/testwelcome');
+const testGoodbyeCommand = require('./commands/testgoodbye');
 
 // Global settings
 global.packname = settings.packname;
 global.author = settings.author;
 global.channelLink = "https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A";
-global.ytch = "Mr Unique Hacker";
+global.ytch = "NathanKanaeru";
 
 // Add this near the top of main.js with other global configurations
 const channelInfo = {
@@ -156,7 +159,7 @@ const channelInfo = {
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
             newsletterJid: '120363161513685998@newsletter',
-            newsletterName: 'KnightBot MD',
+            newsletterName: 'Nathan Bot',
             serverMessageId: -1
         }
     }
@@ -167,7 +170,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
         const { messages, type } = messageUpdate;
         if (type !== 'notify') return;
 
-        const message = messages[0];
+        const message = sock.serializeM(messages[0]);
         if (!message?.message) return;
 
         // Handle autoread functionality
@@ -318,7 +321,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
         }
 
         // List of admin commands
-        const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.setgdesc', '.setgname', '.setgpp'];
+        const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.setgdesc', '.setgname', '.setgpp', '.gc close', '.gc open', '.testwelcome', '.testgoodbye'];
         const isAdminCommand = adminCommands.some(cmd => userMessage.startsWith(cmd));
 
         // List of owner commands
@@ -398,6 +401,22 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 break;
             case userMessage === '.unmute':
                 await unmuteCommand(sock, chatId, senderId);
+                break;
+            case userMessage === '.gc close':
+                await gcCloseCommand(sock, chatId, senderId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.gc open':
+                await gcOpenCommand(sock, chatId, senderId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.testwelcome':
+                await testWelcomeCommand(sock, chatId, message, senderId);
+                commandExecuted = true;
+                break;
+            case userMessage === '.testgoodbye':
+                await testGoodbyeCommand(sock, chatId, message, senderId);
+                commandExecuted = true;
                 break;
             case userMessage.startsWith('.ban'):
                 if (!isGroup) {
@@ -1231,28 +1250,76 @@ async function handleGroupParticipantUpdate(sock, update) {
             // If reading fails, default to public behavior
         }
 
+        // ---------- LID → real JID resolution ----------
+        // When WhatsApp sends group-participants.update, the JIDs can be in LID
+        // format (e.g. "12141884293941@lid") instead of real phone JIDs
+        // ("628121234567@s.whatsapp.net"). We must resolve them here before
+        // passing to welcome/goodbye handlers so the real number is displayed.
+        const resolvedParticipants = await Promise.all(participants.map(async (p) => {
+            const jid = typeof p === 'string' ? p : (p.id || p.toString());
+            // Not a LID — nothing to resolve
+            if (!jid.includes('@lid')) {
+                return jid;
+            }
+
+            // Strategy 1: look in group metadata
+            try {
+                const meta = await sock.groupMetadata(id);
+                const match = meta.participants.find(
+                    m => m.lid === jid || m.id === jid
+                );
+                if (match && match.id && !match.id.includes('@lid')) {
+                    return match.id;
+                }
+            } catch (e) { }
+
+            // Strategy 2: look in the in-memory store contacts
+            try {
+                if (sock.store && sock.store.contacts) {
+                    const entry = Object.values(sock.store.contacts).find(
+                        c => c.lid === jid || c.id === jid
+                    );
+                    if (entry && entry.id && !entry.id.includes('@lid')) {
+                        return entry.id;
+                    }
+                }
+            } catch (e) { }
+
+            // Strategy 3: try onWhatsApp (may fail silently)
+            try {
+                const [result] = await sock.onWhatsApp(jid);
+                if (result && result.jid && !result.jid.includes('@lid')) {
+                    return result.jid;
+                }
+            } catch (e) { }
+
+            return jid;
+        }));
+        // ------------------------------------------------
+
+
         // Handle promotion events
         if (action === 'promote') {
             if (!isPublic) return;
-            await handlePromotionEvent(sock, id, participants, author);
+            await handlePromotionEvent(sock, id, resolvedParticipants, author);
             return;
         }
 
         // Handle demotion events
         if (action === 'demote') {
             if (!isPublic) return;
-            await handleDemotionEvent(sock, id, participants, author);
+            await handleDemotionEvent(sock, id, resolvedParticipants, author);
             return;
         }
 
         // Handle join events
         if (action === 'add') {
-            await handleJoinEvent(sock, id, participants);
+            await handleJoinEvent(sock, id, resolvedParticipants);
         }
 
         // Handle leave events
         if (action === 'remove') {
-            await handleLeaveEvent(sock, id, participants);
+            await handleLeaveEvent(sock, id, resolvedParticipants);
         }
     } catch (error) {
         console.error('Error in handleGroupParticipantUpdate:', error);
